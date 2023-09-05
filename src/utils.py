@@ -1,22 +1,23 @@
 from dnslib import DNSRecord
+import dnslib
 import socket
 
 SIZE = 4096
 
-
 def has_type_a_in_section_ans(parsed_answer: DNSRecord):
-    print(f"parsed rr answers: {parsed_answer.rr}")
-    print(f"parsed rr authority: {parsed_answer.auth}")
-    print(f"parsed rr header: {parsed_answer.header}")
-    # print(f"parsed rr a : {parsed_answer.a}")
-    # Todo: find a lambda that says if there is atleast one
-    # any(map(lambda x: x.,parsed_answer.a))
-    return parsed_answer.header.a > 0
-
+    if parsed_answer.header.a > 1:
+        return parsed_answer.header.a > 0 and any(map(lambda x: x.rtype == dnslib.QTYPE.A, parsed_answer.a))
+    elif parsed_answer.header.a == 1:
+        return parsed_answer.a.rtype == dnslib.QTYPE.A
+    else:
+        return False
 
 def has_type_ns_in_section_auth(parsed_answer: DNSRecord):
-    print(f"parsed ar {parsed_answer.ar}")
-    return parsed_answer.header.ar > 0
+    return parsed_answer.header.auth > 0 and any(map(lambda x: x.rtype == dnslib.QTYPE.NS, parsed_answer.auth))
+
+
+def has_type_a_in_section_add(parsed_answer: DNSRecord):
+    return parsed_answer.header.ar > 0 and any(map(lambda x: x.rtype == dnslib.QTYPE.A, parsed_answer.ar))
 
 
 def send_dns_request(addr: tuple[str, int], msg: bytes):
