@@ -19,19 +19,24 @@ def resolver(consulta: bytes, loc_addr=ROOT_SV):
     # Enviamos la query al servidor raiz y esperamos la consulta
     logging.debug(f"Preguntando por la consulta: {consulta}")
     answer: bytes = send_dns_request(loc_addr, consulta)
+
     # Parseamos la respuesta
     parsed_answer = parse_dns_message(answer)
     logging.debug(f"Respuesta en formato de dig\n {parsed_answer}")
+
     if has_type_a_in_section_ans(parsed_answer):
         return answer
     logging.debug("la respuesta no tiene tipo A en seccion answers")
+
     if has_type_ns_in_section_auth(parsed_answer):
+
         if has_type_a_in_section_add(parsed_answer):
+
+            #gets the ip for the rquest
             addr = (str(parsed_answer.ar[0].rdata), 53)
             logging.debug(f"la direccion es: {addr}")
-            new_ans = send_dns_request(addr, consulta)
-            logging.debug(f"{new_ans}")
             return resolver(consulta, loc_addr=addr)
+
         # else:
         #     query_name = get_name_ns(parsed_answer)
         #     consulta_ns = DNSRecord.question(query_name)
