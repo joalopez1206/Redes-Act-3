@@ -8,7 +8,7 @@ from utils import (send_dns_request, has_type_a_in_section_ans, SIZE,
 
 import logging
 
-logging.basicConfig(format="%(levelname)s-%(message)s", level=logging.DEBUG)
+logging.basicConfig(format="(debug) :: %(message)s", level=logging.DEBUG)
 ROOT_SV = ("192.33.4.12", 53)
 local_addr = ('localhost', 8000)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -17,12 +17,12 @@ sock.bind(local_addr)
 
 def resolver(consulta: bytes, loc_addr=ROOT_SV):
     # Enviamos la query al servidor raiz y esperamos la consulta
-    logging.debug(f"Preguntando por la consulta: {consulta}")
+
     answer: bytes = send_dns_request(loc_addr, consulta)
 
     # Parseamos la respuesta
     parsed_answer = parse_dns_message(answer)
-    logging.debug(f"Respuesta en formato de dig\n {parsed_answer}")
+    #logging.debug(f"Respuesta en formato de dig\n {parsed_answer}")
 
     if has_type_a_in_section_ans(parsed_answer):
         return answer
@@ -32,19 +32,32 @@ def resolver(consulta: bytes, loc_addr=ROOT_SV):
 
         if has_type_a_in_section_add(parsed_answer):
 
-            #gets the ip for the rquest
+            # gets the ip for the rquest
             addr = (str(parsed_answer.ar[0].rdata), 53)
             logging.debug(f"la direccion es: {addr}")
             return resolver(consulta, loc_addr=addr)
 
-        # else:
-        #     query_name = get_name_ns(parsed_answer)
-        #     consulta_ns = DNSRecord.question(query_name)
-        #     answer_ns = resolver(consulta_ns) #<<- habemus ip
-        #     parse_dns_message(answer_ns)
-        #     addrs = get_addrs_from_answer(parsed_answer_ns)
-        #     return resolver(consulta, loc_addr=addrs)
+        else:
+            if type(parsed_answer.auth) == list:
+                query_name = str(parsed_answer.auth[0].rdata)
+            else:
+                query_name = str(parsed_answer.auth.rdata)
+
+            consulta_ns = DNSRecord.question(query_name)
+
+            answer_ns = resolver(consulta_ns.pack())  # <<- habemus ip
+
+            parsed_answer_ns = parse_dns_message(answer_ns)
+            if type(parsed_answer_ns.a) == list:
+                addrs = (str(parsed_answer_ns.a[0].rdata), 53)
+            else:
+                addrs = (str(parsed_answer_ns.a.rdata), 53)
+            logging.debug(f"Consultando '{consulta}' a '{query_name}' con direccion IP {addrs[0]} ")
+
+            return resolver(consulta, loc_addr=addrs)
+
     return answer
+
 
 while True:
     data, a = sock.recvfrom(SIZE)
