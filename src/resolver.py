@@ -1,6 +1,6 @@
 import socket
-from dnslib import DNSRecord
-import dnslib
+from dnslib import DNSRecord, QTYPE, A
+from dnslib import RR
 from dns_parse_mod import parse_dns_message
 from utils import (send_dns_request, has_type_a_in_section_ans, SIZE,
                    has_type_ns_in_section_auth,
@@ -13,20 +13,29 @@ ROOT_SV = ("192.33.4.12", 53)
 local_addr = ('localhost', 8000)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(local_addr)
+cache = {}
 
 
-def resolver(consulta: bytes, loc_addr=ROOT_SV):
+def resolver(consulta: bytes, loc_addr=ROOT_SV, loc_qname='.'):
+    # Vemos el cache!
+    query_name = parse_dns_message(consulta).q.qname
+    if query_name in cache:
+        logging.debug("Se uso el cache!")
+        dns_query = parse_dns_message(consulta)
+        ip_answer = cache[query_name]
+        dns_query.add_answer(*RR.fromZone("{} A {}".format(query_name, ip_answer)))
+        return dns_query.pack()
+    # Si no
     # Enviamos la query al servidor raiz y esperamos la consulta
-
     answer: bytes = send_dns_request(loc_addr, consulta)
 
     # Parseamos la respuesta
     parsed_answer = parse_dns_message(answer)
-    #logging.debug(f"Respuesta en formato de dig\n {parsed_answer}")
+    logging.debug(f"Consultando '{parsed_answer.q.qname}' a '{loc_qname}' con direccion IP {loc_addr[0]} ")
 
     if has_type_a_in_section_ans(parsed_answer):
+        cache[query_name] = parsed_answer.get_a().rdata
         return answer
-    logging.debug("la respuesta no tiene tipo A en seccion answers")
 
     if has_type_ns_in_section_auth(parsed_answer):
 
@@ -34,8 +43,7 @@ def resolver(consulta: bytes, loc_addr=ROOT_SV):
 
             # gets the ip for the rquest
             addr = (str(parsed_answer.ar[0].rdata), 53)
-            logging.debug(f"la direccion es: {addr}")
-            return resolver(consulta, loc_addr=addr)
+            return resolver(consulta, loc_addr=addr, loc_qname=parsed_answer.ar[0].rname)
 
         else:
             if type(parsed_answer.auth) == list:
@@ -52,9 +60,8 @@ def resolver(consulta: bytes, loc_addr=ROOT_SV):
                 addrs = (str(parsed_answer_ns.a[0].rdata), 53)
             else:
                 addrs = (str(parsed_answer_ns.a.rdata), 53)
-            logging.debug(f"Consultando '{consulta}' a '{query_name}' con direccion IP {addrs[0]} ")
 
-            return resolver(consulta, loc_addr=addrs)
+            return resolver(consulta, loc_addr=addrs, loc_qname=query_name)
 
     return answer
 

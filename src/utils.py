@@ -4,13 +4,19 @@ import socket
 
 SIZE = 4096
 
+
 def has_type_a_in_section_ans(parsed_answer: DNSRecord):
     if parsed_answer.header.a > 1:
-        return parsed_answer.header.a > 0 and any(map(lambda x: x.rtype == dnslib.QTYPE.A, parsed_answer.a))
+        try:
+            val = any(map(lambda x: x.rtype == dnslib.QTYPE.A, parsed_answer.a))
+        except TypeError:
+            val = (parsed_answer.a.rtype == dnslib.QTYPE.A)
+        return parsed_answer.header.a > 0 and val
     elif parsed_answer.header.a == 1:
         return parsed_answer.a.rtype == dnslib.QTYPE.A
     else:
         return False
+
 
 def has_type_ns_in_section_auth(parsed_answer: DNSRecord):
     return parsed_answer.header.auth > 0 and any(map(lambda x: x.rtype == dnslib.QTYPE.NS, parsed_answer.auth))
