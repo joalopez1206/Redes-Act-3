@@ -8,6 +8,8 @@ from utils import (send_dns_request, has_type_a_in_section_ans, SIZE,
 
 import logging
 
+# Desactivar el modo debug
+# logging.basicConfig(format="(debug) :: %(message)s", level=logging.INFO)
 logging.basicConfig(format="(debug) :: %(message)s", level=logging.DEBUG)
 ROOT_SV = ("192.33.4.12", 53)
 local_addr = ('localhost', 8000)
@@ -66,7 +68,9 @@ def resolver(consulta: bytes, loc_addr=ROOT_SV, loc_qname='.'):
     return answer
 
 
+print("Server started!")
 while True:
+    print("Waiting for requests")
     data, a = sock.recvfrom(SIZE)
     reply = resolver(data)
     sock.sendto(reply, a)
